@@ -1,3 +1,4 @@
+import {surveySummary,validateSurvey,surveyFeelings} from './survey.js';
 export const metrics=[
  {key:'temperature',name:'온도',unit:'℃',icon:'°',min:-20,max:60,step:0.1,ideal:[20,26],outer:[16,30],hint:'20–26 ℃',low:'냉방을 줄이거나 난방을 조절하고, 창가의 찬바람을 확인해 주세요.',high:'블라인드로 직사광선을 줄이고 냉방 설정을 조절해 주세요.'},
  {key:'humidity',name:'습도',unit:'%',icon:'◒',min:0,max:100,step:0.1,ideal:[40,60],outer:[30,70],hint:'40–60 %',low:'건조함을 확인하고 가습기 사용을 선생님과 상의해 주세요.',high:'제습 기능을 활용하고 젖은 물건이나 결로가 있는지 확인해 주세요.'},
@@ -15,12 +16,12 @@ export function validate(r){
  if(!r.measuredAt||!Number.isFinite(new Date(r.measuredAt).getTime()))throw Error('측정 날짜와 시간을 확인해 주세요.');
  if(!Number.isInteger(r.students)||r.students<0||r.students>100)throw Error('학생 수는 0~100명 사이 정수로 입력해 주세요.');
  for(const m of metrics){const mode=modeOf(r,m.key);if(!['quick','measured'].includes(mode))throw Error('입력 방식을 확인해 주세요.');
- if(mode==='quick'){if(!quickOptions[m.key].includes(r.responses?.[m.key]))throw Error(m.name+'의 체감 응답을 선택해 주세요.');if(r[m.key]!==null)throw Error('간편 입력에는 측정 수치를 저장하지 않습니다.');}
+ if(mode==='quick'){if(r.survey){validateSurvey(r.survey,m.key);if(r.responses?.[m.key]!==surveySummary(r.survey,m.key))throw Error('체감 응답 요약을 확인해 주세요.');}else if(!quickOptions[m.key].includes(r.responses?.[m.key]))throw Error(m.name+'의 체감 응답을 선택해 주세요.');if(r[m.key]!==null)throw Error('간편 입력에는 측정 수치를 저장하지 않습니다.');}
  else if(typeof r[m.key]!=='number'||!Number.isFinite(r[m.key])||r[m.key]<m.min||r[m.key]>m.max)throw Error(m.name+': '+m.min+'~'+m.max+' '+m.unit+' 범위로 입력해 주세요.');}
  if(!Array.isArray(r.feelings)||r.feelings.some(f=>!feelings.includes(f)))throw Error('체감 불편 항목을 확인해 주세요.');return r;
 }
 export function analyze(r){validate(r);
- const items=metrics.map(m=>{const v=measuredValue(r,m.key);if(v===null){const response=r.responses[m.key];const discomfort=feelings.includes(response);const low=['추워요','건조해요','어두워요'].includes(response);return {...m,mode:'quick',value:null,response,level:null,score:null,status:'체감 · 미측정',advice:discomfort?(low?m.low:m.high):'',discomfort};}
+ const items=metrics.map(m=>{const v=measuredValue(r,m.key);if(v===null){const response=r.responses[m.key];const selected=r.survey?surveyFeelings(r.survey):[response];const discomfort=selected.some(f=>feelings.includes(f)&&({더워요:'temperature',추워요:'temperature',습해요:'humidity',건조해요:'humidity',답답해요:'co2',어두워요:'light',눈부셔요:'light',시끄러워요:'noise'}[f]===m.key));const low=selected.some(f=>['추워요','건조해요','어두워요'].includes(f)&&({추워요:'temperature',건조해요:'humidity',어두워요:'light'}[f]===m.key));return {...m,mode:'quick',value:null,response,level:null,score:null,status:'체감 · 미측정',advice:discomfort?(low?m.low:m.high):'',discomfort};}
  const level=v>=m.ideal[0]&&v<=m.ideal[1]?0:v>=m.outer[0]&&v<=m.outer[1]?1:2;return {...m,mode:'measured',value:v,level,status:['적정','주의','개선 필요'][level],score:[100,60,20][level],advice:level?(v<m.ideal[0]?m.low:m.high):''};});
  const measured=items.filter(m=>m.mode==='measured');const measuredCount=measured.length;const score=measuredCount?Math.round(measured.reduce((s,m)=>s+m.score,0)/measuredCount):null;
  const suggestions=items.filter(m=>m.level>0).sort((a,b)=>b.level-a.level).map(m=>({title:m.name+' · '+m.status,text:m.advice,level:m.level}));
