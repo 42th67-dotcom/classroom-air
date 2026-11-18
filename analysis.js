@@ -6,12 +6,21 @@ export const metrics=[
  {key:'light',name:'조도',unit:'lx',icon:'☼',min:0,max:10000,step:1,ideal:[300,750],outer:[150,1000],hint:'300–750 lx',low:'조명을 켜고 책상 위 그림자를 확인해 주세요. 밝기가 고르게 분포하도록 조절해 주세요.',high:'블라인드와 조명 방향을 조절하여 눈부심과 화면 반사를 줄여 주세요.'},
  {key:'noise',name:'소음',unit:'dB',icon:'≋',min:0,max:140,step:0.1,ideal:[0,50],outer:[0,65],hint:'50 dB 이하',high:'대화 소리를 낮추고 복도 소음과 기기 소리를 확인해 주세요. 활동 유형에 맞게 조절해 주세요.'}
 ];
+const actions={
+ temperature:{low:'① 창문 틈과 찬바람이 직접 닿는 자리를 확인하세요. ② 선생님과 상의해 난방 또는 냉방 설정을 조절하고 필요하면 자리를 옮기세요. ③ 조절 후 같은 책상 높이에서 온도를 다시 측정해 전후 기록을 비교하세요.',high:'① 햇빛이 직접 들어오는 창의 블라인드를 조절하세요. ② 선생님과 상의해 냉방 설정과 공기 흐름을 조절하세요. ③ 환경이 안정된 뒤 같은 자리에서 온도를 다시 측정하고 전후 기록을 비교하세요.'},
+ humidity:{low:'① 건조함이 느껴지는 자리와 냉난방 바람의 방향을 확인하세요. ② 선생님과 가습기 사용 여부 및 청소·관리 상태를 확인하세요. ③ 습도계로 같은 위치를 다시 측정해 조절 전후를 비교하세요.',high:'① 젖은 우산·걸레 등 습기를 만드는 물건을 정리하세요. ② 선생님과 제습 기능 사용을 상의하고 창가 결로를 확인하세요. ③ 습도계를 같은 위치에 두고 변화와 체감을 다시 기록하세요.'},
+ co2:{high:'① 쉬는 시간에 선생님과 실외 공기 상태 및 창문 개방 안전을 확인하세요. ② 여건이 허용되면 창문과 문을 열거나 환기 설비를 가동하세요. ③ 환기 후 같은 위치의 CO₂를 다시 측정하고 개선 전후 비교에서 농도 변화를 확인하세요. 공기청정기만으로 환기를 대신하지 마세요.'},
+ light:{low:'① 꺼진 조명을 켜고 고장 난 조명은 선생님께 알리세요. ② 책이나 몸이 책상 위에 만드는 그림자를 확인하고 위치를 조절하세요. ③ 책상 위 같은 위치에서 조도를 다시 측정하세요.',high:'① 눈부심이 창문·조명·화면 중 어디에서 오는지 확인하세요. ② 블라인드 각도와 화면 방향을 바꿔 반사광을 줄이세요. ③ 책이 잘 보이는지 확인하고 책상 위 조도를 다시 측정하세요.'},
+ noise:{high:'① 대화·복도·기기 중 소음의 주된 원인을 찾으세요. ② 대화 소리를 줄이거나 불필요한 기기를 끄도록 상의하세요. 복도 문을 닫는 경우 환기 상태도 함께 확인하세요. ③ 같은 수업 활동과 측정 위치에서 소음을 다시 측정해 비교하세요.'}
+};
+for(const m of metrics)Object.assign(m,actions[m.key]);
 export const feelings=['더워요','추워요','답답해요','습해요','건조해요','어두워요','눈부셔요','시끄러워요'];
 
 export const quickOptions={temperature:['괜찮아요','더워요','추워요','잘 모르겠어요'],humidity:['괜찮아요','습해요','건조해요','잘 모르겠어요'],co2:['답답하지 않아요','답답해요','잘 모르겠어요'],light:['괜찮아요','어두워요','눈부셔요','잘 모르겠어요'],noise:['괜찮아요','시끄러워요','잘 모르겠어요']};
 export function modeOf(r,key){return r.inputModes?.[key]||'measured';}
 export function measuredValue(r,key){return modeOf(r,key)==='measured'&&Number.isFinite(r[key])?r[key]:null;}
 export function validate(r){
+ if(r.schoolId!==undefined&&(!r.schoolId||typeof r.schoolId!=='string'||typeof r.roomId!=='string'||!r.roomId||typeof r.schoolName!=='string'||typeof r.roomName!=='string'))throw Error('학교와 교실을 목록에서 선택해 주세요.');
  if(typeof r.classroom!=='string'||!r.classroom.trim()||r.classroom.length>40)throw Error('교실 이름은 1~40자로 입력해 주세요.');
  if(!r.measuredAt||!Number.isFinite(new Date(r.measuredAt).getTime()))throw Error('측정 날짜와 시간을 확인해 주세요.');
  if(!Number.isInteger(r.students)||r.students<0||r.students>100)throw Error('학생 수는 0~100명 사이 정수로 입력해 주세요.');
@@ -27,7 +36,7 @@ export function analyze(r){validate(r);
  const suggestions=items.filter(m=>m.level>0).sort((a,b)=>b.level-a.level).map(m=>({title:m.name+' · '+m.status,text:m.advice,level:m.level}));
  for(const m of items.filter(m=>m.mode==='quick'&&m.discomfort))suggestions.push({title:m.name+' · 체감 확인',text:m.response+' 응답을 참고한 안내입니다. '+m.advice+' '+(m.key==='co2'?'답답함만으로 CO₂ 농도를 알 수 없습니다. 농도 판단에는 측정기가 필요합니다.':'실제 수치와 상태는 측정 후 확인할 수 있습니다.'),level:1});
  const map={'더워요':'temperature','추워요':'temperature','답답해요':'co2','습해요':'humidity','건조해요':'humidity','어두워요':'light','눈부셔요':'light','시끄러워요':'noise'};
- for(const f of r.feelings){const m=items.find(m=>m.key===map[f]);if(m.response===f)continue;suggestions.push({title:'체감 확인 · '+f,text:'불편한 자리의 환경을 다시 확인하고 선생님과 조절 방법을 상의해 주세요. 체감만으로 수치나 적정 여부를 판단하지 않습니다.',level:1});}
+ for(const f of r.feelings){const m=items.find(m=>m.key===map[f]);if(m.response===f)continue;suggestions.push({title:'체감 확인 · '+f,text:((['추워요','건조해요','어두워요'].includes(f)?m.low:m.high)||'불편한 자리를 확인해 주세요.')+' 체감만으로 수치나 적정 여부를 판단하지 않습니다.',level:1});}
  if(r.students>=30)suggestions.push({title:'학생 수가 많은 교실',text:'학생 수가 많습니다. 쉬는 시간마다 공기 상태를 확인하고 가능하면 환기 전후 CO₂를 측정해 보세요.',level:1});
  if(new Date(r.measuredAt).getHours()>=16&&measuredValue(r,'light')!==null&&r.light<300)suggestions.push({title:'늦은 시간의 조명 점검',text:'자연광이 줄어드는 시간입니다. 책상 위치별 밝기를 확인해 주세요.',level:1});
  if(!suggestions.length)suggestions.push({title:measuredCount===5?'쾌적한 환경을 유지해 주세요':'필요한 항목부터 측정해 보세요',text:measuredCount===5?'모든 측정값이 프로젝트 적정 범위입니다. 다음 쉬는 시간에 다시 확인해 주세요.':'체감 응답은 측정값이 아닙니다. 측정하지 않은 항목의 상태는 확인할 수 없습니다.',level:0});
